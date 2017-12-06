@@ -37,7 +37,7 @@ void iplc_sim_process_pipeline_nop();
 // Outout performance results
 void iplc_sim_finalize();
 
-typedef struct cache_line
+typedef struct cache_line  //sam
 {
     // Your data structures for implementing your cache should include:
     // a valid bit
@@ -153,9 +153,10 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     cache_blockoffsetbits =
     (int) rint((log( (double) (blocksize * 4) )/ log(2)));
     /* Note: rint function rounds the result up prior to casting */
-    
+
     cache_size = assoc * ( 1 << index ) * ((32 * blocksize) + 33 - index - cache_blockoffsetbits);
-    
+    int tag_size = 32 - (cache_blockoffsetbits + index); 
+
     printf("Cache Configuration \n");
     printf("   Index: %d bits or %d lines \n", cache_index, (1<<cache_index) );
     printf("   BlockSize: %d \n", cache_blocksize );
@@ -169,9 +170,12 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     }
     
     cache = (cache_line_t *) malloc((sizeof(cache_line_t) * 1<<index));
-    
-    // Dynamically create our cache based on the information the user entered
+
+    // Dynamically create our cache based on the information the user entered      //Sam
     for (i = 0; i < (1<<index); i++) {
+        cache[i].valid_bit = 0;
+        cache[i].set = (1<<index) % cache_assoc;
+        cache[i].data = (int*) malloc(cache_assoc * sizeof(int));
     }
     
     // init the pipeline -- set all data to zero and instructions to NOP
@@ -185,7 +189,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
  * iplc_sim_trap_address() determined this is not in our cache.  Put it there
  * and make sure that is now our Most Recently Used (MRU) entry.
  */
-void iplc_sim_LRU_replace_on_miss(int index, int tag)
+void iplc_sim_LRU_replace_on_miss(int index, int tag) //raz
 {
     /* You must implement this function */
 }
@@ -194,7 +198,7 @@ void iplc_sim_LRU_replace_on_miss(int index, int tag)
  * iplc_sim_trap_address() determined the entry is in our cache.  Update its
  * information in the cache.
  */
-void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)
+void iplc_sim_LRU_update_on_hit(int index, int assoc_entry) //raz
 {
     /* You must implement this function */
 }
@@ -205,7 +209,7 @@ void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)
  * associativity we may need to check through multiple entries for our
  * desired index.  In that case we will also need to call the LRU functions.
  */
-int iplc_sim_trap_address(unsigned int address)
+int iplc_sim_trap_address(unsigned int address) //raz
 {
     int i=0, index=0;
     int tag=0;
@@ -337,32 +341,39 @@ void iplc_sim_process_pipeline_rtype(char *instruction, int dest_reg, int reg1, 
     pipeline[FETCH].stage.rtype.dest_reg = dest_reg;
 }
 
-void iplc_sim_process_pipeline_lw(int dest_reg, int base_reg, unsigned int data_address)
+void iplc_sim_process_pipeline_lw(int dest_reg, int base_reg, unsigned int data_address) //yev
 {
     /* You must implement this function */
 }
 
-void iplc_sim_process_pipeline_sw(int src_reg, int base_reg, unsigned int data_address)
+void iplc_sim_process_pipeline_sw(int src_reg, int base_reg, unsigned int data_address) //yev
 {
     /* You must implement this function */
 }
 
-void iplc_sim_process_pipeline_branch(int reg1, int reg2)
+void iplc_sim_process_pipeline_branch(int reg1, int reg2) //sam
+{
+    /* You must implement this function */
+    //default to whatever input says (TAKEN, NOT TAKEN)
+    if (reg1 == reg2) {
+        //jump
+    }
+    else {
+        
+    }
+}
+
+void iplc_sim_process_pipeline_jump(char *instruction) //sam
 {
     /* You must implement this function */
 }
 
-void iplc_sim_process_pipeline_jump(char *instruction)
+void iplc_sim_process_pipeline_syscall() //yev
 {
     /* You must implement this function */
 }
 
-void iplc_sim_process_pipeline_syscall()
-{
-    /* You must implement this function */
-}
-
-void iplc_sim_process_pipeline_nop()
+void iplc_sim_process_pipeline_nop()  //yev
 {
     /* You must implement this function */
 }
