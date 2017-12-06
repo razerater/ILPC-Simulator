@@ -39,16 +39,11 @@ void iplc_sim_finalize();
 
 typedef struct cache_line  //sam
 {
-    // Your data structures for implementing your cache should include:
-    // a valid bit
     short int valid_bit; //0 means invalid, 1 means valid
-    // a tag
     int tag;
     int* data;
     int offset;
-    // a method for handling varying levels of associativity
     int set; //the set number a certain cache line is a part of
-    // a method for selecting which item in the cache is going to be replaced
 } cache_line_t;
 
 cache_line_t *cache=NULL;
@@ -354,18 +349,25 @@ void iplc_sim_process_pipeline_sw(int src_reg, int base_reg, unsigned int data_a
 void iplc_sim_process_pipeline_branch(int reg1, int reg2) //sam
 {
     /* You must implement this function */
-    //default to whatever input says (TAKEN, NOT TAKEN)
-    if (reg1 == reg2) {
-        //jump
-    }
-    else {
-        
-    }
+    iplc_sim_push_pipeline_stage();
+
+    pipeline[FETCH].itype = BRANCH;
+    pipeline[FETCH].instruction_address = instruction_address;
+
+    pipeline[FETCH].stage.branch.reg1 = reg1;
+    pipeline[FETCH].stage.branch.reg2 = reg2;
+
 }
 
 void iplc_sim_process_pipeline_jump(char *instruction) //sam
 {
     /* You must implement this function */
+    iplc_sim_push_pipeline_stage();
+
+    pipeline[FETCH].itype = JUMP;
+    pipeline[FETCH].instruction_address = instruction_address;
+
+    pipeline[FETCH].stage.jump.instruction = instruction;
 }
 
 void iplc_sim_process_pipeline_syscall() //yev
