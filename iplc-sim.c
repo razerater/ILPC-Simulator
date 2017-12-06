@@ -41,8 +41,13 @@ typedef struct cache_line
 {
     // Your data structures for implementing your cache should include:
     // a valid bit
+    short int valid_bit; //0 means invalid, 1 means valid
     // a tag
+    int tag;
+    int* data;
+    int offset;
     // a method for handling varying levels of associativity
+    int set; //the set number a certain cache line is a part of
     // a method for selecting which item in the cache is going to be replaced
 } cache_line_t;
 
