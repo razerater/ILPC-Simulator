@@ -170,7 +170,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     for (i = 0; i < (1<<index); i++) {
         cache[i].valid_bit = 0;
         cache[i].set = (1<<index) % cache_assoc;
-        cache[i].data = (int*) malloc(cache_assoc * sizeof(int));
+        cache[i].data = (int*) malloc(cache_blocksize * sizeof(int));
     }
 
     // init the pipeline -- set all data to zero and instructions to NOP
