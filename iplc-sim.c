@@ -41,8 +41,8 @@ void iplc_sim_finalize();
 
 typedef struct cache_line  //sam
 {
-    short int valid_bit; //0 means invalid, 1 means valid
-    int tag;
+    short int* valid_bit; //0 means invalid, 1 means valid
+    int* tag;
     int* data;
     int offset;
 } cache_line_t;
@@ -172,10 +172,9 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     //printf("Allocating space for data...\n");
     // Dynamically create our cache based on the information the user entered      //Sam
     for (i = 0; i < (1<<index); i++) {
-        //printf("i = %d\n", i);
-        cache[i].valid_bit = 0;
-        //printf("keep going\n");
+        cache[i].valid_bit = (int*) calloc(blocksize,sizeof(int));
         cache[i].data = (int*) calloc(blocksize,sizeof(int));
+        cache[i].tag = (int*) calloc(blocksize,sizeof(int));
     }
     //printf("Allocation complete\n\n");
 
@@ -193,21 +192,22 @@ void iplc_sim_init(int index, int blocksize, int assoc)
 /*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/ //raz
 void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
 {
+
+
+
+    //find an empty slot in the set to add the address to
+    //if none exist, remove the LRU in the set and replace it with the address
+    //REMEMBER TO UPDATE TAG AND VALID BIT ALONG WITH THE ADDRESS
+
+
+
+    
+
     if (cache[i].data[j] == 0) {
         // inserting address normally
         cache[i].data[j] = address;
     }
     else {
-        //each address can only be written into a certain line within a set based on a
-        //shared tag, so either add the address to an empty spot on the line or
-        //if needed, replace the LRU value on the line with the address
-
-
-
-
-
-
-
         // inserting in full set
         // each set/array is organized from least recently used to most recently used
         // starting with the first item (LRU), overwrite it with the item at the next index
@@ -255,25 +255,25 @@ int iplc_sim_trap_address(unsigned int address) //raz
     
     // Call the appropriate function for a miss or hit
     int set = address % cache_assoc;
-    int tag = ;//calculate this using bit_twiddling
+    //int tag = ;//calculate this using bit_twiddling
+    /*if (first hex digit of tag == 2)  {
+        //check for instruction hit/miss so only compare tags
+    }
+    else {
+        //check for data hit/miss so compare full addresses
+    }*/
+
+
+
+
     for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) { // i = index of cache_line_t in cache
-        if (/* address tag == line tag */) {
-            //address must be in this block
-            //check all words in this line
-            //if you find the address -> hit
-            //else -> miss
-        }
-        //if address tag != line tag then check the next cache_line
-        //if none of the lines share a tag you might have to replace an entire line
-            //with just this one address but I'm not sure; maybe this can never happen?
-
-
-
-
-
         for (j = 0; j < cache_blocksize; j++) {
             // incrementally check if there is a free space in the set
-            if (cache[i].data[j] == 0) {
+            if (cache[i].data[j] == 0) { //DON'T PUT PRIORITY ON FINDING AN EMPTY SPOT, LOOK FOR THE ADDRESS/TAG YOU ARE SUPPOSED TO BE LOOKING FOR IN THE FIRST PLACE!!!!!!!!!!
+
+                //LOOK FOR A HIT IN ALL POSSIBLE SPOTS, THEN LOOK FOR EMPTY SPOTS
+
+
                 // if there is, insert the address there
                 iplc_sim_LRU_replace_on_miss(i, j, set, address); //don't prioritize finding an empty slot over finding the address
                 /*cache->data[set][j] = address;
