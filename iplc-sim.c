@@ -17,9 +17,9 @@
 void iplc_sim_init(int index, int blocksize, int assoc);
 
 // Cache simulator functions
-void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty);
+void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address);
 // void iplc_sim_LRU_replace_on_miss(int index, int tag);
-void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j);
+void iplc_sim_LRU_update_on_hit(int i, int j, int set, int address);
 // void iplc_sim_LRU_update_on_hit(int index, int assoc);
 int iplc_sim_trap_address(unsigned int address);
 
@@ -54,8 +54,6 @@ int cache_assoc=0;
 long cache_miss=0;
 long cache_access=0;
 long cache_hit=0;
-int tag_size=0; // new
-int index_size=0; // new
 
 char instruction[16];
 char reg1[16];
@@ -152,8 +150,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     /* Note: rint function rounds the result up prior to casting */
 
     cache_size = assoc * ( 1 << index ) * ((32 * blocksize) + 33 - index - cache_blockoffsetbits);
-    tag_size = 32 - (cache_blockoffsetbits + index); // calculates the tag size of every word in the cache
-    index_size = (int) rint((log((double) index)/log(2)));
+    int tag_size = 32 - (cache_blockoffsetbits + index); //calculates the tag size of every word in the cache
 
     printf("Cache Configuration \n");
     printf("   Index: %d bits or %d lines \n", cache_index, (1<<cache_index) );
@@ -183,42 +180,15 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     }
 }
 
-int bit_twiddling(int val, int lsb, int msb) {
-    int mask_on = (1 << (msb-lsb+1))-1;
-    int mask_off = val >> lsb;
-    return mask_on & mask_off;
-}
-
 /*
  * iplc_sim_trap_address() determined this is not in our cache.  Put it there
  * and make sure that is now our Most Recently Used (MRU) entry.
  */
 /*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/ //raz
-void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty)
+void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
 {
-    //find an empty slot in the set to add the address to
-    //if none exist, remove the LRU in the set and replace it with the address
-    //REMEMBER TO UPDATE TAG AND VALID BIT ALONG WITH THE ADDRESS
-    if (empty) {
-        // inserting address in empty space
-        cache[i].data[j] = address;
-        cache[i].tag[j] = tag;
-        cache[i].valid_bit[j] = 1;
-    }
-    else {
-        // inserting into full line
-        for (j = 0; j < cache_blocksize; j++) {
-            cache[i].data[j] = cache[i].data[j+1];
-            cache[i].tag[j] = cache[i].tag[j+1];
-            cache[i].valid_bit[j] = cache[i].valid_bit[j+1];
-        }
-        cache[i].data[j] = address;
-        cache[i].tag[j] = tag;
-        cache[i].valid_bit[j] = 1;
-    }
-    cache_miss++;
-    /*if (cache[i].data[j] == 0) {
-        // inserting address in empty space
+    if (cache[i].data[j] == 0) {
+        // inserting address normally
         cache[i].data[j] = address;
     }
     else {
@@ -237,7 +207,8 @@ void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty)
         }
         // insert the address at the end (MRU)
         cache[i].data[j] = address;
-    }*/
+    }
+    cache_miss++;
 }
 
 /*
@@ -245,50 +216,12 @@ void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty)
  * information in the cache.
  */
 /*void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)*/ //raz
-void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
+void iplc_sim_LRU_update_on_hit(int i, int j, int set, int address)
 {
-    for (; j < cache_blocksize; j++) {
-        if (cache[i].tag[j] == 0) {
-            break;
-        }
-        cache[i].data[j] = cache[i].data[j+1];
-        cache[i].tag[j] = cache[i].tag[j+1];
-        cache[i].valid_bit[j] = cache[i].valid_bit[j+1];
-    }
-    cache[i].data[j] = address;
-    cache[i].tag[j] = tag;
-    cache[i].valid_bit[j] = 1;
+    cache[i].data[j] = address; //is this line necessary?
+    //I thought you were supposed to update the order of the words to reflect that
+    //this address was most recently used
     cache_hit++;
-    // i = index of cache_line in cache
-    /*for (; i < set*cache_assoc+cache_assoc-1; i++) {
-        // j = index of address in cache_line.data
-        for (; j < cache_blocksize-1; j++) {
-            // if the next item in the line is empty, put the address at this position in the line
-            if (cache[i].data[j+1] == 0) {
-                // insert the address at the end (MRU)
-                cache[i].data[j] = address;
-                return;
-            }
-            cache[i].data[j] = cache[i].data[j+1];
-        }
-        // if the first item in the next line is empty, put the address at the end of this line
-        if (cache[i+1].data[0] == 0) {
-            cache[i].data[j] = address;
-            return;
-        }
-        // assign item at end of row to item at start of next row
-        cache[i].data[j] = cache[i+1].data[0];
-        j = 0;
-    }
-    for (; j < cache_blocksize-1; j++) {
-        if (cache[i].data[j+1] == 0) {
-            cache[i].data[j] = address;
-            return;
-        }
-        cache[i].data[j] = cache[i].data[j+1];
-    }
-    // if the cache_lines and each of their data are completely full
-    cache[i].data[j] = address;*/
 }
 
 /*
@@ -299,68 +232,58 @@ void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
  */
 int iplc_sim_trap_address(unsigned int address) //raz
 {
-    int index = bit_twiddling(address, tag_size+1, tag_size+index_size+1);
-    int tag = bit_twiddling(address, 0, tag_size);
+    int i, j;
+    // int index=0;
+    // int tag=0;
+    // int hit=0;
+    
+    // Call the appropriate function for a miss or hit
     int set = address % cache_assoc;
-    int i = set*cache_assoc+index;
-    int j;
-
-    printf("Address: %x Tag= %x, Index %x", address, tag, index);
-
-    // if the address is an instruction type, i.e. it begins with 0x4 and is 6 hex digits
-    if (address >> 22 == 1) {
-        // for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) {
-            // if (cache[i].index == index) {
-                for (j = 0; j < cache_blocksize; j++) {
-                    if (cache[i].tag[j] == tag) {
-                        iplc_sim_LRU_update_on_hit(address, tag, i, j);
-                        return 1; // hit
-                    }
-                    if (cache[i].tag[j] == 0) {
-                        iplc_sim_LRU_replace_on_miss(address, tag, i, j, 1);
-                        return 0; // miss
-                    }
-                }
-            // }
-        // }
+    //int tag = ;//calculate this using bit_twiddling
+    /*if (first hex digit of address == 4)  {
+        //check for instruction hit/miss so only compare tags
     }
-    // else the address is a data type
     else {
-        // for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) {
-            for (j = 0; j < cache_blocksize; j++) {
-                if (cache[i].data[j] == address) {
-                    iplc_sim_LRU_update_on_hit(address, tag, i, j);
-                    return 1; // hit
-                }
-                if (cache[i].data[j] == 0) {
-                    iplc_sim_LRU_replace_on_miss(address, tag, i, j, 1);
-                    return 0; // miss
-                }
-            }
-        // }
-    }
-    iplc_sim_LRU_replace_on_miss(address, tag, i, 0, 0);
-    cache_access++;
-    return 0; // miss
-    /*for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) { // i = index of cache_line_t in cache
+        //check for data hit/miss so compare full addresses
+    }*/
+
+    for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) { // i = index of cache_line_t in cache
         for (j = 0; j < cache_blocksize; j++) {
             // incrementally check if there is a free space in the set
-            if (cache[i].data[j] == 0) {
+            if (cache[i].data[j] == 0) { //DON'T PUT PRIORITY ON FINDING AN EMPTY SPOT, LOOK FOR THE ADDRESS/TAG YOU ARE SUPPOSED TO BE LOOKING FOR IN THE FIRST PLACE!!!!!!!!!!
+
+                //LOOK FOR A HIT IN ALL POSSIBLE SPOTS, THEN LOOK FOR EMPTY SPOTS
+
+
                 // if there is, insert the address there
                 iplc_sim_LRU_replace_on_miss(i, j, set, address); //don't prioritize finding an empty slot over finding the address
+                /*cache->data[set][j] = address;
+                cache_miss++;
+                break;*/
                 return 0; // miss
             }
             else if (cache[i].data[j] == address) {
                 // address is already in the set, so move over existing items to put it at the end
                 iplc_sim_LRU_update_on_hit(i, j, set, address);
                 return 1; // hit
+                /*for (; j < cache_assoc-1; j++) {
+                    cache->data[set][j] = cache->data[set][j+1];
+                    // if we reach a 0, break out
+                    if (cache->data[set][j+1] == 0) {
+                        break;
+                    }
+                }
+                cache->data[set][j] = address;
+                cache_hit++;
+                hit = 1;
+                break;*/
             }
         }
     }
     // if we've reached the end of the set, i.e. we didn't find a space for the address:
     iplc_sim_LRU_replace_on_miss(i, j, set, address);
     ++cache_access;
-    return 0; // miss*/
+    return 0; // miss
 }
 
 /*
@@ -492,7 +415,11 @@ void iplc_sim_push_pipeline_stage()
         //int inserted_nop = 0; Do we need this?
         cache_access++;
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
-        if(!data_hit) {
+        if( (!data_hit) && ) {
+            //if MEM.dest_reg is equal to reg1 or reg2 in either DECODE or ALU -> then don't stall and add address to cache
+            //else miss
+                //what this means is it's ok that the data_address isn't in the cache yet because it is in one of our registers, therefore no stall is needed
+                //see "Pipeline Details" in pdf
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
             for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
@@ -508,7 +435,11 @@ void iplc_sim_push_pipeline_stage()
     if (pipeline[MEM].itype == SW) {
        cache_access++; 
        data_hit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
-       if(!data_hit) {
+       if( (!data_hit) && ) {
+            //if MEM.src_reg is equal to reg1 or reg2 in either DECODE or ALU -> then don't stall and add address to cache
+            //else miss
+                //what this means is it's ok that the data_address isn't in the cache yet because it is in one of our registers, therefore no stall is needed
+                //see "Pipeline Details" in pdf
             pipeline_cycles += (CACHE_MISS_DELAY - 1);
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
             for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
