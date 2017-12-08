@@ -68,7 +68,7 @@ unsigned int branch_predict_taken=0;
 unsigned int branch_count=0;
 unsigned int correct_branch_predictions=0;
 
-unsigned int debug=0;
+unsigned int debug=1;
 unsigned int dump_pipeline=1;
 
 enum instruction_type {NOP, RTYPE, LW, SW, BRANCH, JUMP, JAL, SYSCALL};
@@ -165,13 +165,19 @@ void iplc_sim_init(int index, int blocksize, int assoc)
         exit(-1);
     }
 
-    cache = (cache_line_t *) malloc((sizeof(cache_line_t) * 1<<index));
+    //printf("Allocating cache...\n");
+    cache = (cache_line_t *) calloc(1<<index,sizeof(cache_line_t));
+    //printf("Allocation complete\n\n");
 
+    //printf("Allocating space for data...\n");
     // Dynamically create our cache based on the information the user entered      //Sam
     for (i = 0; i < (1<<index); i++) {
+        //printf("i = %d\n", i);
         cache[i].valid_bit = 0;
-        cache[i].data = (int*) malloc(cache_blocksize * sizeof(int));
+        //printf("keep going\n");
+        cache[i].data = (int*) calloc(blocksize,sizeof(int));
     }
+    //printf("Allocation complete\n\n");
 
     // init the pipeline -- set all data to zero and instructions to NOP
     for (i = 0; i < MAX_STAGES; i++) {
@@ -192,6 +198,16 @@ void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
         cache[i].data[j] = address;
     }
     else {
+        //each address can only be written into a certain line within a set based on a
+        //shared tag, so either add the address to an empty spot on the line or
+        //if needed, replace the LRU value on the line with the address
+
+
+
+
+
+        
+
         // inserting in full set
         // each set/array is organized from least recently used to most recently used
         // starting with the first item (LRU), overwrite it with the item at the next index
@@ -218,7 +234,9 @@ void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
 /*void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)*/ //raz
 void iplc_sim_LRU_update_on_hit(int i, int j, int set, int address)
 {
-    cache[i].data[j] = address;
+    cache[i].data[j] = address; //is this line necessary?
+    //I thought you were supposed to update the order of the words to reflect that
+    //this address was most recently used
     cache_hit++;
 }
 
@@ -237,13 +255,27 @@ int iplc_sim_trap_address(unsigned int address) //raz
     
     // Call the appropriate function for a miss or hit
     int set = address % cache_assoc;
-    for (i = set*cache_assoc; i < set*cache_assoc+4; i++) { // i = index of cache_line_t in cache
-        // assume set refers to blocks of 4
+    int tag = ;//calculate this using bit_twiddling
+    for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) { // i = index of cache_line_t in cache
+        if (/* address tag == line tag */) {
+            //address must be in this block
+            //check all words in this line
+            //if you find the address -> hit
+            //else -> miss
+        }
+        //if address tag != line tag then check the next cache_line
+        //if none of the lines share a tag you might have to replace an entire line
+            //with just this one address but I'm not sure; maybe this can never happen?
+
+
+
+
+
         for (j = 0; j < cache_blocksize; j++) {
             // incrementally check if there is a free space in the set
             if (cache[i].data[j] == 0) {
                 // if there is, insert the address there
-                iplc_sim_LRU_replace_on_miss(i, j, set, address);
+                iplc_sim_LRU_replace_on_miss(i, j, set, address); //don't prioritize finding an empty slot over finding the address
                 /*cache->data[set][j] = address;
                 cache_miss++;
                 break;*/
@@ -380,12 +412,14 @@ void iplc_sim_push_pipeline_stage()
      */
     if (pipeline[MEM].itype == LW) {
         //int inserted_nop = 0; Do we need this?
+        cache_access++;
         int isHit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
         if(!isHit) pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
     }
 
     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
     if (pipeline[MEM].itype == SW) {
+       cache_access++; 
        int isHit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
        if(!isHit) pipeline_cycles += (CACHE_MISS_DELAY - 1);
     }
