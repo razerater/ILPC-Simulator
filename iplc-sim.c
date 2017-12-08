@@ -17,8 +17,10 @@
 void iplc_sim_init(int index, int blocksize, int assoc);
 
 // Cache simulator functions
-void iplc_sim_LRU_replace_on_miss(int index, int tag);
-void iplc_sim_LRU_update_on_hit(int index, int assoc);
+void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address);
+// void iplc_sim_LRU_replace_on_miss(int index, int tag);
+void iplc_sim_LRU_update_on_hit(int i, int j, int set, int address);
+// void iplc_sim_LRU_update_on_hit(int index, int assoc);
 int iplc_sim_trap_address(unsigned int address);
 
 // Pipeline functions
@@ -183,7 +185,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
  * and make sure that is now our Most Recently Used (MRU) entry.
  */
 /*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/ //raz
-void iplc_sim_LRU_replace_on_miss(int i, int j, int address)
+void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
 {
     if (cache[i].data[j] == 0) {
         // inserting address normally
@@ -214,7 +216,7 @@ void iplc_sim_LRU_replace_on_miss(int i, int j, int address)
  * information in the cache.
  */
 /*void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)*/ //raz
-void iplc_sim_LRU_update_on_hit(int i, int j, int address)
+void iplc_sim_LRU_update_on_hit(int i, int j, int set, int address)
 {
     cache[i].data[j] = address;
     cache_hit++;
@@ -241,7 +243,7 @@ int iplc_sim_trap_address(unsigned int address) //raz
             // incrementally check if there is a free space in the set
             if (cache[i].data[j] == 0) {
                 // if there is, insert the address there
-                iplc_sim_LRU_replace_on_miss(i, j, address);
+                iplc_sim_LRU_replace_on_miss(i, j, set, address);
                 /*cache->data[set][j] = address;
                 cache_miss++;
                 break;*/
@@ -249,7 +251,7 @@ int iplc_sim_trap_address(unsigned int address) //raz
             }
             else if (cache[i].data[j] == address) {
                 // address is already in the set, so move over existing items to put it at the end
-                iplc_sim_LRU_update_on_hit(i, j, address);
+                iplc_sim_LRU_update_on_hit(i, j, set, address);
                 return 1; // hit
                 /*for (; j < cache_assoc-1; j++) {
                     cache->data[set][j] = cache->data[set][j+1];
@@ -266,7 +268,7 @@ int iplc_sim_trap_address(unsigned int address) //raz
         }
     }
     // if we've reached the end of the set, i.e. we didn't find a space for the address:
-    iplc_sim_LRU_replace_on_miss(i, j, address);
+    iplc_sim_LRU_replace_on_miss(i, j, set, address);
     ++cache_access;
     return 0; // miss
 }
@@ -376,22 +378,22 @@ void iplc_sim_push_pipeline_stage()
     /* 3. Check for LW delays due to use in ALU stage and if data hit/miss
      *    add delay cycles if needed.
      */
-     if (pipeline[MEM].itype == LW) {
-         //int inserted_nop = 0; Do we need this?
-         int isHit = trap_address(pipeline[MEM].stage.lw.data_address);
-         if(!isHit) pipe_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
-     }
+    if (pipeline[MEM].itype == LW) {
+        //int inserted_nop = 0; Do we need this?
+        int isHit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
+        if(!isHit) pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+    }
 
-     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
-     if (pipeline[MEM].itype == SW) {
-       int isHit = trap_address(pipeline[MEM].stage.sw.data_address);
-       if(!isHit) pipe_cycles += (CACHE_MISS_DELAY - 1);
-     }
+    /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
+    if (pipeline[MEM].itype == SW) {
+       int isHit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
+       if(!isHit) pipeline_cycles += (CACHE_MISS_DELAY - 1);
+    }
 
-    /* 5. Increment pipe_cycles 1 cycle for normal processing */  //sam
+    /* 5. Increment pipeline_cycles 1 cycle for normal processing */  //sam
     pipeline_cycles++;
     /* 6. push stages thru MEM->WB, ALU->MEM, DECODE->ALU, FETCH->DECODE */  //sam
-    pipeline[WB] = pipeline[MEM];
+    pipeline[WRITEBACK] = pipeline[MEM];
     pipeline[MEM] = pipeline[ALU];
     pipeline[ALU] = pipeline[DECODE];
     pipeline[DECODE] = pipeline[FETCH];
