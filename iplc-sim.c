@@ -201,7 +201,7 @@ void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
 
 
 
-    
+
 
     if (cache[i].data[j] == 0) {
         // inserting address normally
@@ -256,7 +256,7 @@ int iplc_sim_trap_address(unsigned int address) //raz
     // Call the appropriate function for a miss or hit
     int set = address % cache_assoc;
     //int tag = ;//calculate this using bit_twiddling
-    /*if (first hex digit of tag == 2)  {
+    /*if (first hex digit of address == 4)  {
         //check for instruction hit/miss so only compare tags
     }
     else {
