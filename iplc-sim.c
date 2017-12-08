@@ -348,6 +348,22 @@ void iplc_sim_dump_pipeline()
     }
 }
 
+void push_stages() {
+    /* pushes instructions through to the next stage in the pipeline*/
+    pipeline[WRITEBACK] = pipeline[MEM];
+    pipeline[MEM] = pipeline[ALU];
+    pipeline[ALU] = pipeline[DECODE];
+    pipeline[DECODE] = pipeline[FETCH];
+}
+
+void branch_prediction_incorrect() {
+    /* stalls one cycle and fetches nop */
+    pipeline_cycles++;
+    push_stages();
+    pipeline[FETCH].itype = NOP;
+    pipeline[FETCH].instruction_address = 0;
+}
+
 /*
  * Check if various stages of our pipeline require stalls, forwarding, etc.
  * Then push the contents of our various pipeline stages through the pipeline.
@@ -376,7 +392,7 @@ void iplc_sim_push_pipeline_stage()
             }
             else {
                 //branch prediction incorrect - stall one cycle
-                pipeline_cycles++;
+                branch_prediction_incorrect();
             }
         }
         else {
@@ -387,7 +403,7 @@ void iplc_sim_push_pipeline_stage()
             }
             else {
                 //branch prediction incorrect - stall one cycle
-                pipeline_cycles++;
+                branch_prediction_incorrect();
             }
         }
     }
@@ -398,10 +414,13 @@ void iplc_sim_push_pipeline_stage()
     if (pipeline[MEM].itype == LW) {
         //int inserted_nop = 0; Do we need this?
         cache_access++;
-        int isHit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
-        if(!isHit) {
+        data_hit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
+        if(!data_hit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
+            for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
+                push_stages();
+            }
         }
         else {
             printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
@@ -411,10 +430,13 @@ void iplc_sim_push_pipeline_stage()
     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
     if (pipeline[MEM].itype == SW) {
        cache_access++; 
-       int isHit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
-       if(!isHit) {
+       data_hit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
+       if(!data_hit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1);
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
+            for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
+                push_stages();
+            }
         }
         else {
             printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
@@ -424,10 +446,7 @@ void iplc_sim_push_pipeline_stage()
     /* 5. Increment pipeline_cycles 1 cycle for normal processing */  //sam
     pipeline_cycles++;
     /* 6. push stages thru MEM->WB, ALU->MEM, DECODE->ALU, FETCH->DECODE */  //sam
-    pipeline[WRITEBACK] = pipeline[MEM];
-    pipeline[MEM] = pipeline[ALU];
-    pipeline[ALU] = pipeline[DECODE];
-    pipeline[DECODE] = pipeline[FETCH];
+    push_stages();
     // 7. This is a give'me -- Reset the FETCH stage to NOP via bezero */
     bzero(&(pipeline[FETCH]), sizeof(pipeline_t));
 }
