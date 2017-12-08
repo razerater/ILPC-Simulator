@@ -68,7 +68,7 @@ unsigned int branch_predict_taken=0;
 unsigned int branch_count=0;
 unsigned int correct_branch_predictions=0;
 
-unsigned int debug=1;
+unsigned int debug=0;
 unsigned int dump_pipeline=1;
 
 enum instruction_type {NOP, RTYPE, LW, SW, BRANCH, JUMP, JAL, SYSCALL};
@@ -172,7 +172,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     //printf("Allocating space for data...\n");
     // Dynamically create our cache based on the information the user entered      //Sam
     for (i = 0; i < (1<<index); i++) {
-        cache[i].valid_bit = (int*) calloc(blocksize,sizeof(int));
+        cache[i].valid_bit = (short int*) calloc(blocksize,sizeof(short int));
         cache[i].data = (int*) calloc(blocksize,sizeof(int));
         cache[i].tag = (int*) calloc(blocksize,sizeof(int));
     }
@@ -414,14 +414,26 @@ void iplc_sim_push_pipeline_stage()
         //int inserted_nop = 0; Do we need this?
         cache_access++;
         int isHit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
-        if(!isHit) pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+        if(!isHit) {
+            pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+            printf("DATA MISS:\tAddress: %x\n",pipeline[MEM].stage.lw.data_address);
+        }
+        else {
+            printf("DATA HIT:\tAddress: %x\n",pipeline[MEM].stage.lw.data_address);
+        }
     }
 
     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
     if (pipeline[MEM].itype == SW) {
        cache_access++; 
        int isHit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
-       if(!isHit) pipeline_cycles += (CACHE_MISS_DELAY - 1);
+       if(!isHit) {
+            pipeline_cycles += (CACHE_MISS_DELAY - 1);
+            printf("DATA MISS:\tAddress: %x\n",pipeline[MEM].stage.sw.data_address);
+        }
+        else {
+            printf("DATA HIT:\tAddress: %x\n",pipeline[MEM].stage.sw.data_address);
+        }
     }
 
     /* 5. Increment pipeline_cycles 1 cycle for normal processing */  //sam
