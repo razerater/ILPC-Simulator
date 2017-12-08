@@ -150,7 +150,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     (int) rint((log( (double) (blocksize * 4) )/ log(2)));
     /* Note: rint function rounds the result up prior to casting */
 
-    cache_size = assoc * ( 1 << index ) * ((32 * blocksize) + 33 - index - cache_blockoffsetbits);
+    cache_size = index;//assoc * ( 1 << index ) * ((32 * blocksize) + 33 - index - cache_blockoffsetbits);
     int tag_size = 32 - (cache_blockoffsetbits + index);
 
     printf("Cache Configuration \n");
@@ -195,7 +195,7 @@ void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
         // inserting in full set
         // each set/array is organized from least recently used to most recently used
         // starting with the first item (LRU), overwrite it with the item at the next index
-        for (i = set*cache_assoc; i < set*cache_assoc+3; i++) {
+        for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc-1; i++) {
             for (j = 0; j < cache_blocksize-1; j++) {
                 cache[i].data[j] = cache[i].data[j+1];
             }
