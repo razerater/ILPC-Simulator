@@ -1,3 +1,23 @@
+Skip to content
+Help save net neutrality! A free, open internet is once again at stake—and we need your help.
+Learn more  Dismiss
+This repository
+Search
+Pull requests
+Issues
+Marketplace
+Explore
+ @Ygrebinskiy
+ Sign out
+ Watch 2
+  Star 0  Fork 0 razerater/ILPC-Simulator
+ Code  Issues 0  Pull requests 0  Projects 0  Wiki  Insights
+Branch: master Find file Copy pathILPC-Simulator/iplc-sim.c
+f994e55  2 minutes ago
+@pianogod pianogod Add files via upload
+3 contributors @pianogod @razerater @Ygrebinskiy
+RawBlameHistory
+624 lines (524 sloc)  19.7 KB
 /***********************************************************************/
 /***********************************************************************
  Pipeline Cache Simulator
@@ -77,7 +97,7 @@ typedef struct rtype
     int reg1;
     int reg2_or_constant;
     int dest_reg;
-    
+
 } rtype_t;
 
 typedef struct load_word
@@ -85,7 +105,7 @@ typedef struct load_word
     unsigned int data_address;
     int dest_reg;
     int base_reg;
-    
+
 } lw_t;
 
 typedef struct store_word
@@ -99,14 +119,14 @@ typedef struct branch
 {
     int reg1;
     int reg2;
-    
+
 } branch_t;
 
 
 typedef struct jump
 {
     char instruction[16];
-    
+
 } jump_t;
 
 typedef struct pipeline
@@ -122,7 +142,7 @@ typedef struct pipeline
         jump_t    jump;
     }
     stage;
-    
+
 } pipeline_t;
 
 enum pipeline_stages {FETCH, DECODE, ALU, MEM, WRITEBACK};
@@ -142,14 +162,14 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     cache_index = index;
     cache_blocksize = blocksize;
     cache_assoc = assoc;
-    
-    
+
+
     cache_blockoffsetbits =
     (int) rint((log( (double) (blocksize * 4) )/ log(2)));
     /* Note: rint function rounds the result up prior to casting */
 
     cache_size = assoc * ( 1 << index ) * ((32 * blocksize) + 33 - index - cache_blockoffsetbits);
-    int tag_size = 32 - (cache_blockoffsetbits + index); 
+    int tag_size = 32 - (cache_blockoffsetbits + index);
 
     printf("Cache Configuration \n");
     printf("   Index: %d bits or %d lines \n", cache_index, (1<<cache_index) );
@@ -157,12 +177,12 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     printf("   Associativity: %d \n", cache_assoc );
     printf("   BlockOffSetBits: %d \n", cache_blockoffsetbits );
     printf("   CacheSize: %lu \n", cache_size );
-    
+
     if (cache_size > MAX_CACHE_SIZE ) {
         printf("Cache too big. Great than MAX SIZE of %d .... \n", MAX_CACHE_SIZE);
         exit(-1);
     }
-    
+
     cache = (cache_line_t *) malloc((sizeof(cache_line_t) * 1<<index));
 
     // Dynamically create our cache based on the information the user entered      //Sam
@@ -170,7 +190,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
         cache[i].valid_bit = 0;
         cache[i].data = (int*) malloc(block_size * sizeof(int));
     }
-    
+
     // init the pipeline -- set all data to zero and instructions to NOP
     for (i = 0; i < MAX_STAGES; i++) {
         // itype is set to O which is NOP type instruction
@@ -197,7 +217,7 @@ void iplc_sim_LRU_update_on_hit(int index, int assoc_entry) //raz
 }
 
 /*
- * Check if the address is in our cache.  Update our counter statistics 
+ * Check if the address is in our cache.  Update our counter statistics
  * for cache_access, cache_hit, etc.  If our configuration supports
  * associativity we may need to check through multiple entries for our
  * desired index.  In that case we will also need to call the LRU functions.
@@ -207,7 +227,7 @@ int iplc_sim_trap_address(unsigned int address) //raz
     int i=0, index=0;
     int tag=0;
     int hit=0;
-    
+
     // Call the appropriate function for a miss or hit
 
     /* expects you to return 1 for hit, 0 for miss */
@@ -227,7 +247,7 @@ void iplc_sim_finalize()
            pipeline[WRITEBACK].itype != NOP) {
         iplc_sim_push_pipeline_stage();
     }
-    
+
     printf(" Cache Performance \n");
     printf("\t Number of Cache Accesses is %ld \n", cache_access);
     printf("\t Number of Cache Misses is %ld \n", cache_miss);
@@ -251,7 +271,7 @@ void iplc_sim_finalize()
 void iplc_sim_dump_pipeline()
 {
     int i;
-    
+
     for (i = 0; i < MAX_STAGES; i++) {
         switch(i) {
             case FETCH:
@@ -284,7 +304,7 @@ void iplc_sim_push_pipeline_stage()
 {
     int i;
     int data_hit=1;
-    
+
     /* 1. Count WRITEBACK stage is "retired" -- This I'm giving you */
     if (pipeline[WRITEBACK].instruction_address) {
         instruction_count++;
@@ -292,7 +312,7 @@ void iplc_sim_push_pipeline_stage()
             printf("DEBUG: Retired Instruction at 0x%x, Type %d, at Time %u \n",
                    pipeline[WRITEBACK].instruction_address, pipeline[WRITEBACK].itype, pipeline_cycles);
     }
-    
+
     /* 2. Check for BRANCH and correct/incorrect Branch Prediction */  //sam
     if (pipeline[DECODE].itype == BRANCH) {
         int branch_taken = pipeline[FETCH].instruction_address;
@@ -315,18 +335,22 @@ void iplc_sim_push_pipeline_stage()
             }
         }
     }
-    
+
     /* 3. Check for LW delays due to use in ALU stage and if data hit/miss
      *    add delay cycles if needed.
      */
-    if (pipeline[MEM].itype == LW) {
-        int inserted_nop = 0;
-    }
-    
-    /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
-    if (pipeline[MEM].itype == SW) {
-    }
-    
+     if (pipeline[MEM].itype == LW) {
+         //int inserted_nop = 0; Do we need this?
+         int isHit = trap_address(pipeline[MEM].stage.lw.data_address);
+         if(!isHit) pipe_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+     }
+
+     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
+     if (pipeline[MEM].itype == SW) {
+       int isHit = trap_address(pipeline[MEM].stage.sw.data_address);
+       if(!isHit) pipe_cycles += (CACHE_MISS_DELAY - 1);
+     }
+
     /* 5. Increment pipe_cycles 1 cycle for normal processing */  //sam
     pipeline_cycles++;
     /* 6. push stages thru MEM->WB, ALU->MEM, DECODE->ALU, FETCH->DECODE */  //sam
@@ -346,10 +370,10 @@ void iplc_sim_process_pipeline_rtype(char *instruction, int dest_reg, int reg1, 
 {
     /* This is an example of what you need to do for the rest */
     iplc_sim_push_pipeline_stage();
-    
+
     pipeline[FETCH].itype = RTYPE;
     pipeline[FETCH].instruction_address = instruction_address;
-    
+
     strcpy(pipeline[FETCH].stage.rtype.instruction, instruction);
     pipeline[FETCH].stage.rtype.reg1 = reg1;
     pipeline[FETCH].stage.rtype.reg2_or_constant = reg2_or_constant;
@@ -367,6 +391,7 @@ void iplc_sim_process_pipeline_lw(int dest_reg, int base_reg, unsigned int data_
     pipeline[FETCH].stage.lw.dest_reg = dest_reg;
     pipeline[FETCH].stage.lw.base_reg = base_reg;
     pipeline[FETCH].stage.lw.data_address = data_address;
+
 }
 
 void iplc_sim_process_pipeline_sw(int src_reg, int base_reg, unsigned int data_address) //yev
@@ -393,6 +418,8 @@ void iplc_sim_process_pipeline_branch(int reg1, int reg2) //sam
     pipeline[FETCH].stage.branch.reg1 = reg1;
     pipeline[FETCH].stage.branch.reg2 = reg2;
 
+    branch_count++;
+
 }
 
 void iplc_sim_process_pipeline_jump(char *instruction) //sam
@@ -418,10 +445,12 @@ void iplc_sim_process_pipeline_syscall() //yev
 void iplc_sim_process_pipeline_nop()  //yev
 {
     /* You must implement this function */
+    iplc_sim_push_pipeline_stage();
+
     pipeline[FETCH].itype = NOP;
     pipeline[FETCH].instruction_address = instruction_address;
 }
-}
+
 
 /************************************************************************************************/
 /* parse Function *******************************************************************************/
@@ -436,14 +465,14 @@ unsigned int iplc_sim_parse_reg(char *reg_str)
     // turn comma into \n
     if (reg_str[strlen(reg_str)-1] == ',')
         reg_str[strlen(reg_str)-1] = '\n';
-    
+
     if (reg_str[0] != '$')
         return atoi(reg_str);
     else {
         // copy down over $ character than return atoi
         for (i = 0; i < strlen(reg_str); i++)
             reg_str[i] = reg_str[i+1];
-        
+
         return atoi(reg_str);
     }
 }
@@ -462,30 +491,30 @@ void iplc_sim_parse_instruction(char *buffer)
     char str_src_reg2[16];
     char str_dest_reg[16];
     char str_constant[16];
-    
+
     if (sscanf(buffer, "%x %s", &instruction_address, instruction ) != 2) {
         printf("Malformed instruction \n");
         exit(-1);
     }
-    
+
     instruction_hit = iplc_sim_trap_address( instruction_address );
-    
+
     // if a MISS, then push current instruction thru pipeline
     if (!instruction_hit) {
         // need to subtract 1, since the stage is pushed once more for actual instruction processing
         // also need to allow for a branch miss prediction during the fetch cache miss time -- by
         // counting cycles this allows for these cycles to overlap and not doubly count.
-        
+
         printf("INST MISS:\t Address 0x%x \n", instruction_address);
-        
+
         for (i = pipeline_cycles, j = pipeline_cycles; i < j + CACHE_MISS_DELAY - 1; i++)
             iplc_sim_push_pipeline_stage();
     }
     else
         printf("INST HIT:\t Address 0x%x \n", instruction_address);
-    
+
     // Parse the Instruction
-    
+
     if (strncmp( instruction, "add", 3 ) == 0 ||
         strncmp( instruction, "sll", 3 ) == 0 ||
         strncmp( instruction, "ori", 3 ) == 0) {
@@ -499,14 +528,14 @@ void iplc_sim_parse_instruction(char *buffer)
                    instruction, instruction_address);
             exit(-1);
         }
-        
+
         dest_reg = iplc_sim_parse_reg(str_dest_reg);
         src_reg = iplc_sim_parse_reg(str_src_reg);
         src_reg2 = iplc_sim_parse_reg(str_src_reg2);
-        
+
         iplc_sim_process_pipeline_rtype(instruction, dest_reg, src_reg, src_reg2);
     }
-    
+
     else if (strncmp( instruction, "lui", 3 ) == 0) {
         if (sscanf(buffer, "%x %s %s %s",
                    &instruction_address,
@@ -517,13 +546,13 @@ void iplc_sim_parse_instruction(char *buffer)
                    instruction, instruction_address );
             exit(-1);
         }
-        
+
         dest_reg = iplc_sim_parse_reg(str_dest_reg);
         src_reg = -1;
         src_reg2 = -1;
         iplc_sim_process_pipeline_rtype(instruction, dest_reg, src_reg, src_reg2);
     }
-    
+
     else if (strncmp( instruction, "lw", 2 ) == 0 ||
              strncmp( instruction, "sw", 2 ) == 0  ) {
         if ( sscanf( buffer, "%x %s %s %s %x",
@@ -535,17 +564,17 @@ void iplc_sim_parse_instruction(char *buffer)
             printf("Bad instruction: %s at address %x \n", instruction, instruction_address);
             exit(-1);
         }
-        
+
         if (strncmp(instruction, "lw", 2 ) == 0) {
-            
+
             dest_reg = iplc_sim_parse_reg(reg1);
-            
+
             // don't need to worry about base regs -- just insert -1 values
             iplc_sim_process_pipeline_lw(dest_reg, -1, data_address);
         }
         if (strncmp( instruction, "sw", 2 ) == 0) {
             src_reg = iplc_sim_parse_reg(reg1);
-            
+
             // don't need to worry about base regs -- just insert -1 values
             iplc_sim_process_pipeline_sw( src_reg, -1, data_address);
         }
@@ -593,31 +622,31 @@ int main()
     int index = 10;
     int blocksize = 1;
     int assoc = 1;
-    
+
     printf("Please enter the tracefile: ");
     scanf("%s", trace_file_name);
-    
+
     trace_file = fopen(trace_file_name, "r");
-    
+
     if ( trace_file == NULL ) {
         printf("fopen failed for %s file\n", trace_file_name);
         exit(-1);
     }
-    
+
     printf("Enter Cache Size (index), Blocksize and Level of Assoc \n");
     scanf( "%d %d %d", &index, &blocksize, &assoc );
-    
+
     printf("Enter Branch Prediction: 0 (NOT taken), 1 (TAKEN): ");
     scanf("%d", &branch_predict_taken );
-    
+
     iplc_sim_init(index, blocksize, assoc);
-    
+
     while (fgets(buffer, 80, trace_file) != NULL) {
         iplc_sim_parse_instruction(buffer);
         if (dump_pipeline)
             iplc_sim_dump_pipeline();
     }
-    
+
     iplc_sim_finalize();
     return 0;
 }
