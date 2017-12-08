@@ -41,10 +41,9 @@ void iplc_sim_finalize();
 
 typedef struct cache_line  //sam
 {
-    short int* valid_bit; //0 means invalid, 1 means valid
-    int* tag;
-    int* data;
-    int offset;
+    short int* valid_bit; //0 means invalid data, 1 means valid data
+    int* tag; //unique ID for each word that's derived from the address
+    int* data; //word stored from main memory
 } cache_line_t;
 
 cache_line_t *cache=NULL;
@@ -151,7 +150,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     /* Note: rint function rounds the result up prior to casting */
 
     cache_size = assoc * ( 1 << index ) * ((32 * blocksize) + 33 - index - cache_blockoffsetbits);
-    int tag_size = 32 - (cache_blockoffsetbits + index);
+    int tag_size = 32 - (cache_blockoffsetbits + index); //calculates the tag size of every word in the cache
 
     printf("Cache Configuration \n");
     printf("   Index: %d bits or %d lines \n", cache_index, (1<<cache_index) );
@@ -165,18 +164,14 @@ void iplc_sim_init(int index, int blocksize, int assoc)
         exit(-1);
     }
 
-    //printf("Allocating cache...\n");
     cache = (cache_line_t *) calloc(1<<index,sizeof(cache_line_t));
-    //printf("Allocation complete\n\n");
 
-    //printf("Allocating space for data...\n");
     // Dynamically create our cache based on the information the user entered      //Sam
     for (i = 0; i < (1<<index); i++) {
         cache[i].valid_bit = (short int*) calloc(blocksize,sizeof(short int));
         cache[i].data = (int*) calloc(blocksize,sizeof(int));
         cache[i].tag = (int*) calloc(blocksize,sizeof(int));
     }
-    //printf("Allocation complete\n\n");
 
     // init the pipeline -- set all data to zero and instructions to NOP
     for (i = 0; i < MAX_STAGES; i++) {
@@ -192,17 +187,6 @@ void iplc_sim_init(int index, int blocksize, int assoc)
 /*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/ //raz
 void iplc_sim_LRU_replace_on_miss(int i, int j, int set, int address)
 {
-
-
-
-    //find an empty slot in the set to add the address to
-    //if none exist, remove the LRU in the set and replace it with the address
-    //REMEMBER TO UPDATE TAG AND VALID BIT ALONG WITH THE ADDRESS
-
-
-
-
-
     if (cache[i].data[j] == 0) {
         // inserting address normally
         cache[i].data[j] = address;
@@ -262,9 +246,6 @@ int iplc_sim_trap_address(unsigned int address) //raz
     else {
         //check for data hit/miss so compare full addresses
     }*/
-
-
-
 
     for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) { // i = index of cache_line_t in cache
         for (j = 0; j < cache_blocksize; j++) {
@@ -390,18 +371,22 @@ void iplc_sim_push_pipeline_stage()
         if (branch_taken == pipeline[DECODE].instruction_address + 4) {
             //branch not taken
             if (branch_predict_taken == 0) {
+                //branch prediction correct
                 correct_branch_predictions++;
             }
             else {
+                //branch prediction incorrect - stall one cycle
                 pipeline_cycles++;
             }
         }
         else {
             //branch taken
             if (branch_predict_taken == 1) {
+                //branch prediction correct
                 correct_branch_predictions++;
             }
             else {
+                //branch prediction incorrect - stall one cycle
                 pipeline_cycles++;
             }
         }
@@ -416,10 +401,10 @@ void iplc_sim_push_pipeline_stage()
         int isHit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
         if(!isHit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
-            printf("DATA MISS:\tAddress: %x\n",pipeline[MEM].stage.lw.data_address);
+            printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
         }
         else {
-            printf("DATA HIT:\tAddress: %x\n",pipeline[MEM].stage.lw.data_address);
+            printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
         }
     }
 
@@ -429,10 +414,10 @@ void iplc_sim_push_pipeline_stage()
        int isHit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
        if(!isHit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1);
-            printf("DATA MISS:\tAddress: %x\n",pipeline[MEM].stage.sw.data_address);
+            printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
         }
         else {
-            printf("DATA HIT:\tAddress: %x\n",pipeline[MEM].stage.sw.data_address);
+            printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
         }
     }
 
@@ -453,7 +438,7 @@ void iplc_sim_push_pipeline_stage()
  */
 void iplc_sim_process_pipeline_rtype(char *instruction, int dest_reg, int reg1, int reg2_or_constant)
 {
-    /* This is an example of what you need to do for the rest */
+    /* fetches rtype instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = RTYPE;
@@ -467,7 +452,7 @@ void iplc_sim_process_pipeline_rtype(char *instruction, int dest_reg, int reg1, 
 
 void iplc_sim_process_pipeline_lw(int dest_reg, int base_reg, unsigned int data_address) //yev
 {
-    /* You must implement this function */
+    /* fetches load word instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = LW;
@@ -481,7 +466,7 @@ void iplc_sim_process_pipeline_lw(int dest_reg, int base_reg, unsigned int data_
 
 void iplc_sim_process_pipeline_sw(int src_reg, int base_reg, unsigned int data_address) //yev
 {
-    /* You must implement this function */
+    /* fetches store word instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = SW;
@@ -494,7 +479,7 @@ void iplc_sim_process_pipeline_sw(int src_reg, int base_reg, unsigned int data_a
 
 void iplc_sim_process_pipeline_branch(int reg1, int reg2) //sam
 {
-    /* You must implement this function */
+    /* fetches branch instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = BRANCH;
@@ -509,7 +494,7 @@ void iplc_sim_process_pipeline_branch(int reg1, int reg2) //sam
 
 void iplc_sim_process_pipeline_jump(char *instruction) //sam
 {
-    /* You must implement this function */
+    /* fetches jump instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = JUMP;
@@ -520,7 +505,7 @@ void iplc_sim_process_pipeline_jump(char *instruction) //sam
 
 void iplc_sim_process_pipeline_syscall() //yev
 {
-    /* You must implement this function */
+    /* fetches syscall instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = SYSCALL;
@@ -529,7 +514,7 @@ void iplc_sim_process_pipeline_syscall() //yev
 
 void iplc_sim_process_pipeline_nop()  //yev
 {
-    /* You must implement this function */
+    /* fetches nop instruction */
     iplc_sim_push_pipeline_stage();
 
     pipeline[FETCH].itype = NOP;
