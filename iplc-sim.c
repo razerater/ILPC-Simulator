@@ -1,23 +1,3 @@
-Skip to content
-Help save net neutrality! A free, open internet is once again at stake—and we need your help.
-Learn more  Dismiss
-This repository
-Search
-Pull requests
-Issues
-Marketplace
-Explore
- @Ygrebinskiy
- Sign out
- Watch 2
-  Star 0  Fork 0 razerater/ILPC-Simulator
- Code  Issues 0  Pull requests 0  Projects 0  Wiki  Insights
-Branch: master Find file Copy pathILPC-Simulator/iplc-sim.c
-f994e55  2 minutes ago
-@pianogod pianogod Add files via upload
-3 contributors @pianogod @razerater @Ygrebinskiy
-RawBlameHistory
-624 lines (524 sloc)  19.7 KB
 /***********************************************************************/
 /***********************************************************************
  Pipeline Cache Simulator
@@ -188,7 +168,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
     // Dynamically create our cache based on the information the user entered      //Sam
     for (i = 0; i < (1<<index); i++) {
         cache[i].valid_bit = 0;
-        cache[i].data = (int*) malloc(block_size * sizeof(int));
+        cache[i].data = (int*) malloc(cache_blocksize * sizeof(int));
     }
 
     // init the pipeline -- set all data to zero and instructions to NOP
@@ -202,36 +182,93 @@ void iplc_sim_init(int index, int blocksize, int assoc)
  * iplc_sim_trap_address() determined this is not in our cache.  Put it there
  * and make sure that is now our Most Recently Used (MRU) entry.
  */
-void iplc_sim_LRU_replace_on_miss(int index, int tag) //raz
+/*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/ //raz
+void iplc_sim_LRU_replace_on_miss(int i, int j, int address)
 {
-    /* You must implement this function */
+    if (cache[i].data[j] == 0) {
+        // inserting address normally
+        cache[i].data[j] = address;
+    }
+    else {
+        // inserting in full set
+        // each set/array is organized from least recently used to most recently used
+        // starting with the first item (LRU), overwrite it with the item at the next index
+        for (i = set*cache_assoc; i < set*cache_assoc+3; i++) {
+            for (j = 0; j < cache_blocksize-1; j++) {
+                cache[i].data[j] = cache[i].data[j+1];
+            }
+            // assign item at end of row to item at start of next row
+            cache[i].data[j] = cache[i+1].data[0];
+        }
+        for (j = 0; j < cache_blocksize-1; j++) {
+            cache[i].data[j] = cache[i].data[j+1];
+        }
+        // insert the address at the end (MRU)
+        cache[i].data[j] = address;
+    }
+    cache_miss++;
 }
 
 /*
  * iplc_sim_trap_address() determined the entry is in our cache.  Update its
  * information in the cache.
  */
-void iplc_sim_LRU_update_on_hit(int index, int assoc_entry) //raz
+/*void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)*/ //raz
+void iplc_sim_LRU_update_on_hit(int i, int j, int address)
 {
-    /* You must implement this function */
+    cache[i].data[j] = address;
+    cache_hit++;
 }
 
 /*
- * Check if the address is in our cache.  Update our counter statistics
+ * Check if the address is in our cache.  Update our counter statistics 
  * for cache_access, cache_hit, etc.  If our configuration supports
  * associativity we may need to check through multiple entries for our
  * desired index.  In that case we will also need to call the LRU functions.
  */
 int iplc_sim_trap_address(unsigned int address) //raz
 {
-    int i=0, index=0;
-    int tag=0;
-    int hit=0;
-
+    int i, j;
+    // int index=0;
+    // int tag=0;
+    // int hit=0;
+    
     // Call the appropriate function for a miss or hit
-
-    /* expects you to return 1 for hit, 0 for miss */
-    return hit;
+    int set = address % cache_assoc;
+    for (i = set*cache_assoc; i < set*cache_assoc+4; i++) { // i = index of cache_line_t in cache
+        // assume set refers to blocks of 4
+        for (j = 0; j < cache_blocksize; j++) {
+            // incrementally check if there is a free space in the set
+            if (cache[i].data[j] == 0) {
+                // if there is, insert the address there
+                iplc_sim_LRU_replace_on_miss(i, j, address);
+                /*cache->data[set][j] = address;
+                cache_miss++;
+                break;*/
+                return 0; // miss
+            }
+            else if (cache[i].data[j] == address) {
+                // address is already in the set, so move over existing items to put it at the end
+                iplc_sim_LRU_update_on_hit(i, j, address);
+                return 1; // hit
+                /*for (; j < cache_assoc-1; j++) {
+                    cache->data[set][j] = cache->data[set][j+1];
+                    // if we reach a 0, break out
+                    if (cache->data[set][j+1] == 0) {
+                        break;
+                    }
+                }
+                cache->data[set][j] = address;
+                cache_hit++;
+                hit = 1;
+                break;*/
+            }
+        }
+    }
+    // if we've reached the end of the set, i.e. we didn't find a space for the address:
+    iplc_sim_LRU_replace_on_miss(i, j, address);
+    ++cache_access;
+    return 0; // miss
 }
 
 /*
