@@ -608,9 +608,6 @@ void iplc_sim_push_pipeline_stage()
             }*/
         }
     }
-    else {
-        printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
-    }
 
     /* 5. Increment pipeline_cycles 1 cycle for normal processing */  //sam
     pipeline_cycles++;
