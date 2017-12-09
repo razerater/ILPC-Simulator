@@ -37,7 +37,7 @@ void iplc_sim_process_pipeline_nop();
 // Outout performance results
 void iplc_sim_finalize();
 
-typedef struct cache_line  //sam
+typedef struct cache_line
 {
     short int* valid_bit; //0 means invalid data, 1 means valid data
     int* tag; //unique ID for each word that's derived from the address
@@ -167,7 +167,7 @@ void iplc_sim_init(int index, int blocksize, int assoc)
 
     cache = (cache_line_t *) calloc(1<<index,sizeof(cache_line_t));
 
-    // Dynamically create our cache based on the information the user entered    //Sam
+    // Dynamically create our cache based on the information the user entered
     for (i = 0; i < (1<<index); i++) {
         cache[i].valid_bit = (short int*) calloc(blocksize,sizeof(short int));
         cache[i].data = (int*) calloc(blocksize,sizeof(int));
@@ -191,7 +191,7 @@ int bit_twiddling(int val, int lsb, int msb) {
  * iplc_sim_trap_address() determined this is not in our cache.  Put it there
  * and make sure that is now our Most Recently Used (MRU) entry.
  */
-/*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/ //raz
+/*void iplc_sim_LRU_replace_on_miss(int index, int tag)*/
 void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty)
 {
     // find an empty slot in the set to add the address to
@@ -222,7 +222,6 @@ void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty)
  * iplc_sim_trap_address() determined the entry is in our cache.  Update its
  * information in the cache.
  */
-/*void iplc_sim_LRU_update_on_hit(int index, int assoc_entry)*/ //raz
 void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
 {
     for (; j < cache_blocksize-1; j++) {
@@ -246,7 +245,7 @@ void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
  * associativity we may need to check through multiple entries for our
  * desired index.  In that case we will also need to call the LRU functions.
  */
-int iplc_sim_trap_address(unsigned int address) //raz
+int iplc_sim_trap_address(unsigned int address)
 {
     int index = bit_twiddling(address, cache_blockoffsetbits, cache_blockoffsetbits+index_size);
     int tag = bit_twiddling(address, cache_blockoffsetbits+index_size+1, cache_blockoffsetbits+index_size+tag_size);
@@ -333,7 +332,7 @@ void iplc_sim_dump_pipeline()
 }
 
 void push_stages() {
-    /* pushes instructions through to the next stage in the pipeline*/
+    /* pushes instructions through to the next stage in the pipeline */
     pipeline[WRITEBACK] = pipeline[MEM];
     pipeline[MEM] = pipeline[ALU];
     pipeline[ALU] = pipeline[DECODE];
@@ -350,7 +349,6 @@ void branch_prediction_incorrect() {
 
 void iplc_sim_push_pipeline_stage()
 {
-    //int i;
     int data_hit=1;
 
     /* 1. Count WRITEBACK stage is "retired" -- This I'm giving you */
@@ -361,7 +359,7 @@ void iplc_sim_push_pipeline_stage()
                    pipeline[WRITEBACK].instruction_address, pipeline[WRITEBACK].itype, pipeline_cycles);
     }
 
-    /* 2. Check for BRANCH and correct/incorrect Branch Prediction */  //sam
+    /* 2. Check for BRANCH and correct/incorrect Branch Prediction */ 
     if (pipeline[DECODE].itype == BRANCH) {
         int branch_taken = pipeline[FETCH].instruction_address;
         if (branch_taken == pipeline[DECODE].instruction_address + 4) {
@@ -398,6 +396,7 @@ void iplc_sim_push_pipeline_stage()
             printf("DATA MISS:\tAddress: 0x%x\n",pipeline[WRITEBACK].stage.sw.data_address);
         }
         else {
+            // Cache hit
             printf("DATA HIT:\tAddress: 0x%x\n",pipeline[WRITEBACK].stage.sw.data_address);
         }
     }
@@ -408,10 +407,12 @@ void iplc_sim_push_pipeline_stage()
     if (pipeline[MEM].itype == LW) {
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
         if (!data_hit) {
-            pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+            // If we miss the cache access, incur the penalty given.
+            pipeline_cycles += (CACHE_MISS_DELAY - 1); 
             printf("DATA MISS:\tAddress: 0x%x\n",pipeline[MEM].stage.lw.data_address);
         }
         else {
+            // Data address we're looking for found in cache
             printf("DATA HIT:\tAddress: 0x%x\n",pipeline[MEM].stage.lw.data_address);
         }
     }
@@ -480,7 +481,7 @@ void iplc_sim_process_pipeline_branch(int reg1, int reg2)
     pipeline[FETCH].stage.branch.reg1 = reg1;
     pipeline[FETCH].stage.branch.reg2 = reg2;
 
-    branch_count++;
+    branch_count++; //keeps track of number of branch instructions
 }
 
 void iplc_sim_process_pipeline_jump(char *instruction)
