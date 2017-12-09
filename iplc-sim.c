@@ -371,7 +371,7 @@ void iplc_sim_push_pipeline_stage()
     int data_hit=1;
 
     /* 1. Count WRITEBACK stage is "retired" -- This I'm giving you */
-    if (pipeline[WRITEBACK].instruction_address) {
+    if (pipeline[WRITEBACK].instruction_address > 0) {
         instruction_count++;
         if (debug)
             printf("DEBUG: Retired Instruction at 0x%x, Type %d, at Time %u \n",
@@ -412,132 +412,27 @@ void iplc_sim_push_pipeline_stage()
     if (pipeline[MEM].itype == LW) {
         //int inserted_nop = 0; Do we need this?
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
-        unsigned int canForward = 0;
-        if(!data_hit) {
-            // if MEM.dest_reg is equal to reg1 or reg2 in either DECODE or ALU -> then don't stall and add address to cache
-            // else miss
-/*
-            //Check the decode and mem for an rtype. Unnecessary line, but here for formatting.
-            if (pipeline[DECODE].itype == RTYPE || pipeline[ALU].itype == RTYPE) {
-                //Check the registers of the rtype if we have an rtype in decode
-                if (pipeline[DECODE].itype == RTYPE) {
-                    if (pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg1 ||
-                        pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg2_or_constant) {
-                        canForward = 1;
-                    }
-                }
-                if (pipeline[ALU].itype == RTYPE) {
-                    //Check the registers of the rtype if we have an rtype in alu
-                    if (pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg1 ||
-                        pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg2_or_constant) {
-                        canForward = 1;
-                    }
-                }
-            }
-            //Check the decode and mem for a branch. Unnecessary line, but here for formatting.
-            if (pipeline[DECODE].itype == BRANCH || pipeline[ALU].itype == BRANCH) {
-                if (pipeline[DECODE].itype == BRANCH){
-                    //Check the registers of the rtype if we have an branch in decode
-                    if (pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.branch.reg1 ||
-                        pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.branch.reg2) {
-                        canForward = 1;
-                    }
-                }
-                if (pipeline[ALU].itype == BRANCH) {
-                    //Check the registers of the rtype if we have an branch in alu
-                    if (pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.branch.reg1 ||
-                        pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.branch.reg2) {
-                        canForward = 1;
-                    }
-                }
-            }*/
-        }
-        if (!data_hit /*&& !canForward*/) {
+        if (!data_hit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
-            /*for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
-                push_stages();
-            }*/
         }
-        else if (data_hit /*|| canForward*/) {
+        else {
             printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
-            if (!data_hit && canForward) {
-                iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
-                cache_miss--;
-            }
+
         }
     }
 
     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
     if (pipeline[WRITEBACK].itype == SW) {
-        unsigned int canForward = 0;
         data_hit = iplc_sim_trap_address(pipeline[WRITEBACK].stage.sw.data_address);
+
         if (!data_hit) {
-            // if WRITEBACK.src_reg is equal to reg1 or reg2 in either DECODE, ALU, or MEM -> then don't stall and add address to cache
-            // else miss
-/*
-            //Check the decode and mem for an rtype. Unnecessary line, but here for formatting.
-            if (pipeline[DECODE].itype == RTYPE || pipeline[ALU].itype == RTYPE || pipeline[MEM].itype == RTYPE){
-                //Check the registers of the rtype if we have an rtype in decode
-                if (pipeline[DECODE].itype == RTYPE){
-                    if (pipeline[WRITEBACK].stage.sw.src_reg == pipeline[DECODE].stage.rtype.reg1 ||
-                        pipeline[WRITEBACK].stage.sw.src_reg == pipeline[DECODE].stage.rtype.reg2_or_constant) {
-                        canForward = 1;
-                    }
-                }
-                if(pipeline[ALU].itype == RTYPE){
-                    //Check the registers of the rtype if we have an rtype in alu
-                    if (pipeline[WRITEBACK].stage.sw.src_reg == pipeline[ALU].stage.rtype.reg1 ||
-                        pipeline[WRITEBACK].stage.sw.src_reg == pipeline[ALU].stage.rtype.reg2_or_constant) {
-                        canForward = 1;
-                    }
-                }
-                if(pipeline[MEM].itype == RTYPE){
-                    //Check the registers of the rtype if we have an rtype in alu
-                    if(pipeline[WRITEBACK].stage.sw.src_reg == pipeline[MEM].stage.rtype.reg1 ||
-                       pipeline[WRITEBACK].stage.sw.src_reg == pipeline[MEM].stage.rtype.reg2_or_constant) {
-                       canForward = 1;
-                    }
-                }
-            }
-            //Check the decode and mem for a branch. Unnecessary line, but here for formatting.
-            if (pipeline[DECODE].itype == BRANCH || pipeline[ALU].itype == BRANCH || pipeline[ALU].itype == BRANCH) {
-                if (pipeline[DECODE].itype == BRANCH) {
-                    //Check the registers of the rtype if we have an branch in decode
-                    if (pipeline[WRITEBACK].stage.sw.src_reg == pipeline[DECODE].stage.branch.reg1 ||
-                        pipeline[WRITEBACK].stage.sw.src_reg == pipeline[DECODE].stage.branch.reg2) {
-                        canForward = 1;
-                    }
-                }
-                if (pipeline[ALU].itype == BRANCH) {
-                    //Check the registers of the rtype if we have an branch in alu
-                    if (pipeline[WRITEBACK].stage.sw.src_reg == pipeline[ALU].stage.branch.reg1 ||
-                        pipeline[WRITEBACK].stage.sw.src_reg == pipeline[ALU].stage.branch.reg2) {
-                        canForward = 1;
-                    }
-                }
-                if (pipeline[MEM].itype == BRANCH) {
-                    //Check the registers of the rtype if we have an branch in alu
-                    if (pipeline[WRITEBACK].stage.sw.src_reg == pipeline[MEM].stage.branch.reg1 ||
-                        pipeline[WRITEBACK].stage.sw.src_reg == pipeline[MEM].stage.branch.reg2) {
-                        canForward = 1;
-                    }
-                }
-            }*/
-        }
-        if (!data_hit /*&& !canForward*/) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
             printf("DATA MISS:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
-            /*for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
-                push_stages();
-            }*/
         }
-        else if (data_hit /*|| canForward*/){
+        else{
             printf("DATA HIT:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
-            if (!data_hit && canForward) {
-                iplc_sim_trap_address(pipeline[WRITEBACK].stage.sw.data_address);
-                cache_miss--;
-            }
+
         }
     }
 
