@@ -216,6 +216,7 @@ void iplc_sim_LRU_replace_on_miss(int address, int tag, int i, int j, int empty)
         cache[i].tag[j] = tag;
         cache[i].valid_bit[j] = 1;
     }
+    cache_access++;
     cache_miss++;
     /*if (cache[i].data[j] == 0) {
         // inserting address in empty space
@@ -258,6 +259,7 @@ void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
     cache[i].data[j] = address;
     cache[i].tag[j] = tag;
     cache[i].valid_bit[j] = 1;
+    cache_access++;
     cache_hit++;
     // i = index of cache_line in cache
     /*for (; i < set*cache_assoc+cache_assoc-1; i++) {
@@ -340,7 +342,6 @@ int iplc_sim_trap_address(unsigned int address) //raz
         // }
     }
     iplc_sim_LRU_replace_on_miss(address, tag, i, 0, 0);
-    cache_access++;
     return 0; // miss
     /*for (i = set*cache_assoc; i < set*cache_assoc+cache_assoc; i++) { // i = index of cache_line_t in cache
         for (j = 0; j < cache_blocksize; j++) {
@@ -485,7 +486,6 @@ void iplc_sim_push_pipeline_stage()
      */
     if (pipeline[MEM].itype == LW) {
         //int inserted_nop = 0; Do we need this?
-        cache_access++;
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
         unsigned int canForward = 0;
         if(!data_hit) {
@@ -497,14 +497,14 @@ void iplc_sim_push_pipeline_stage()
               //Check the registers of the rtype if we have an rtype in decode
               if(pipeline[DECODE].itype == RTYPE){
                 if(pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg1 ||
-                   pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg2) {
+                   pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg2_or_constant) {
                    canForward = 1;
                 }
               }
               if(pipeline[ALU].itype == RTYPE){
                 //Check the registers of the rtype if we have an rtype in alu
                 if(pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg1 ||
-                   pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg2) {
+                   pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg2_or_constant) {
                     canForward = 1;
                 }
               }
@@ -545,7 +545,6 @@ void iplc_sim_push_pipeline_stage()
 
     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
     if (pipeline[WRITEBACK].itype == SW) {
-        cache_access++;
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
         if(!data_hit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1);
