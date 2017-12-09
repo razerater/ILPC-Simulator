@@ -450,8 +450,8 @@ void iplc_sim_push_pipeline_stage()
                         canForward = 1;
                     }
                 }
-            }
-        }*/
+            }*/
+        }
         if (!data_hit /*&& !canForward*/) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
@@ -523,8 +523,8 @@ void iplc_sim_push_pipeline_stage()
                         canForward = 1;
                     }
                 }
-            }
-        }*/
+            }*/
+        }
         if (!data_hit /*&& !canForward*/) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
             printf("DATA MISS:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
