@@ -431,20 +431,15 @@ void push_stages() {
     pipeline[MEM] = pipeline[ALU];
     pipeline[ALU] = pipeline[DECODE];
     pipeline[DECODE] = pipeline[FETCH];
+    bzero(&(pipeline[FETCH]), sizeof(pipeline_t));
 }
 
 void branch_prediction_incorrect() {
     /* stalls one cycle and fetches nop */
     pipeline_cycles++;
     push_stages();
-    pipeline[FETCH].itype = NOP;
-    pipeline[FETCH].instruction_address = 0;
 }
 
-/*
- * Check if various stages of our pipeline require stalls, forwarding, etc.
- * Then push the contents of our various pipeline stages through the pipeline.
- */
 void iplc_sim_push_pipeline_stage()
 {
     int i;
@@ -492,31 +487,63 @@ void iplc_sim_push_pipeline_stage()
         //int inserted_nop = 0; Do we need this?
         cache_access++;
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
-        if( (!data_hit) && ) {
+        unsigned int canForward = 0;
+        if(!data_hit) {
             // if MEM.dest_reg is equal to reg1 or reg2 in either DECODE or ALU -> then don't stall and add address to cache
             // else miss
-            // what this means is it's ok that the data_address isn't in the cache yet because it is in one of our registers, therefore no stall is needed
-            // see "Pipeline Details" in pdf
-            pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
-            printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
-            for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
-                push_stages();
+
+            //Check the decode and mem for an rtype. Unnecessary line, but here for formatting.
+            if(pipeline[DECODE].itype == RTYPE || pipeline[ALU].itype == RTYPE){
+              //Check the registers of the rtype if we have an rtype in decode
+              if(pipeline[DECODE].itype == RTYPE){
+                if(pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg1 ||
+                   pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.rtype.reg2) {
+                   canForward = 1;
+                }
+              }
+              if(pipeline[ALU].itype == RTYPE){
+                //Check the registers of the rtype if we have an rtype in alu
+                if(pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg1 ||
+                   pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.rtype.reg2) {
+                    canForward = 1;
+                }
+              }
+            }
+            //Check the decode and mem for a branch. Unnecessary line, but here for formatting.
+            if(pipeline[DECODE].itype == BRANCH || pipeline[ALU].itype == BRANCH){
+              if(pipeline[DECODE].itype == BRANCH){
+                //Check the registers of the rtype if we have an branch in decode
+                if(pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.branch.reg1 ||
+                   pipeline[MEM].stage.lw.dest_reg == pipeline[DECODE].stage.branch.reg2) {
+                   canForward = 1;
+                }
+              }
+              if(pipeline[ALU].itype == BRANCH){
+                //Check the registers of the rtype if we have an branch in alu
+                if(pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.branch.reg1 ||
+                   pipeline[MEM].stage.lw.dest_reg == pipeline[ALU].stage.branch.reg2) {
+                    canForward = 1;
+                }
+              }
             }
         }
-        else {
+        if(!data_hit && !canForward){
+          pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+          printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
+          for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
+              push_stages();
+          }
+        }
+        else if (data_hit || canForward){
             printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
         }
     }
 
     /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
-    if (pipeline[MEM].itype == SW) {
-        cache_access++; 
+    if (pipeline[WRITEBACK].itype == SW) {
+        cache_access++;
         data_hit = iplc_sim_trap_address(pipeline[MEM].stage.sw.data_address);
-        if( (!data_hit) && ) {
-            // if MEM.dest_reg is equal to reg1 or reg2 in either DECODE or ALU -> then don't stall and add address to cache
-            // else miss
-            // what this means is it's ok that the data_address isn't in the cache yet because it is in one of our registers, therefore no stall is needed
-            // see "Pipeline Details" in pdf
+        if(!data_hit) {
             pipeline_cycles += (CACHE_MISS_DELAY - 1);
             printf("DATA MISS:\tAddress: %X\n",pipeline[MEM].stage.sw.data_address);
             for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
@@ -533,7 +560,7 @@ void iplc_sim_push_pipeline_stage()
     /* 6. push stages thru MEM->WB, ALU->MEM, DECODE->ALU, FETCH->DECODE */  //sam
     push_stages();
     // 7. This is a give'me -- Reset the FETCH stage to NOP via bezero */
-    bzero(&(pipeline[FETCH]), sizeof(pipeline_t));
+    //b-zero is included in push_stages() helper function
 }
 
 /*
