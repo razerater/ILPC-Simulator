@@ -256,7 +256,7 @@ int iplc_sim_trap_address(unsigned int address) //raz
     int i = set*cache_assoc+index;
     int j;
 
-    printf("Address: %x Tag= %x, Index= %x\n", address, tag, index);
+    printf("Address %x: Tag= %x, Index= %x\n", address, tag, index);
 
     // if the address is an instruction type, i.e. it begins with 0x4 and is 6 hex digits
     //if (address >> 22 == 1) {
