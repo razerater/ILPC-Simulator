@@ -255,35 +255,21 @@ int iplc_sim_trap_address(unsigned int address) //raz
     int set = address % cache_assoc;
     int i = set*cache_assoc+index;
     int j;
-
+    printf("%d\n", i);
     printf("Address %x: Tag= %x, Index= %x\n", address, tag, index);
 
     // if the address is an instruction type, i.e. it begins with 0x4 and is 6 hex digits
-    //if (address >> 22 == 1) {
-        for (j = 0; j < cache_blocksize; j++) {
-            if (cache[i].tag[j] == tag) {
-                iplc_sim_LRU_update_on_hit(address, tag, i, j);
-                return 1; // hit
-            }
-            if (cache[i].tag[j] == 0) {
-                iplc_sim_LRU_replace_on_miss(address, tag, i, j, 1);
-                return 0; // miss
-            }
-        }
-    //}
+    for (j = 0; j < cache_blocksize; j++) {
+      if (cache[i].tag[j] == tag) {
+        iplc_sim_LRU_update_on_hit(address, tag, i, j);
+        return 1; // hit
+      }
+      if (cache[i].tag[j] == 0) {
+        iplc_sim_LRU_replace_on_miss(address, tag, i, j, 1);
+        return 0; // miss
+      }
+    }
     // else the address is a data type
-    /*else {
-        for (j = 0; j < cache_blocksize; j++) {
-            if (cache[i].tag[j] == tag) {
-                iplc_sim_LRU_update_on_hit(address, tag, i, j);
-                return 1; // hit
-            }
-            if (cache[i].tag[j] == 0) {
-                iplc_sim_LRU_replace_on_miss(address, tag, i, j, 1);
-                return 0; // miss
-            }
-        }
-    }*/
     iplc_sim_LRU_replace_on_miss(address, tag, i, 0, 0);
     return 0; // miss
 }
@@ -371,40 +357,27 @@ void iplc_sim_push_pipeline_stage()
     int data_hit=1;
 
     /* 1. Count WRITEBACK stage is "retired" -- This I'm giving you */
-    if (pipeline[WRITEBACK].instruction_address > 0) {
+    if (pipeline[WRITEBACK].instruction_address) {
         instruction_count++;
         if (debug)
             printf("DEBUG: Retired Instruction at 0x%x, Type %d, at Time %u \n",
                    pipeline[WRITEBACK].instruction_address, pipeline[WRITEBACK].itype, pipeline_cycles);
     }
 
-    /* 2. Check for BRANCH and correct/incorrect Branch Prediction */  //sam
-    if (pipeline[DECODE].itype == BRANCH) {
-        int branch_taken = pipeline[FETCH].instruction_address;
-        if (branch_taken == pipeline[DECODE].instruction_address + 4) {
-            //branch not taken
-            if (branch_predict_taken == 0) {
-                //branch prediction correct
-                correct_branch_predictions++;
-            }
-            else {
-                //branch prediction incorrect - stall one cycle
-                branch_prediction_incorrect();
-            }
+    /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
+    if (pipeline[WRITEBACK].itype == SW) {
+        data_hit = iplc_sim_trap_address(pipeline[WRITEBACK].stage.sw.data_address);
+
+        if (!data_hit) {
+            pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
+            printf("DATA MISS:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
         }
-        else {
-            //branch taken
-            if (branch_taken != 0) printf("DEBUG: Branch Taken: FETCH addr = %X, DECODE instr addr = %X\n",branch_taken,pipeline[DECODE].instruction_address);
-            if (branch_predict_taken == 1) {
-                //branch prediction correct
-                correct_branch_predictions++;
-            }
-            else {
-                //branch prediction incorrect - stall one cycle
-                branch_prediction_incorrect();
-            }
+        else{
+            printf("DATA HIT:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
+
         }
     }
+
 
     /* 3. Check for LW delays due to use in ALU stage and if data hit/miss
      *    add delay cycles if needed.
@@ -422,17 +395,31 @@ void iplc_sim_push_pipeline_stage()
         }
     }
 
-    /* 4. Check for SW mem acess and data miss .. add delay cycles if needed */
-    if (pipeline[WRITEBACK].itype == SW) {
-        data_hit = iplc_sim_trap_address(pipeline[WRITEBACK].stage.sw.data_address);
-
-        if (!data_hit) {
-            pipeline_cycles += (CACHE_MISS_DELAY - 1); //If we miss the cache access, incur the penalty given.
-            printf("DATA MISS:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
+    /* 2. Check for BRANCH and correct/incorrect Branch Prediction */  //sam
+    if (pipeline[DECODE].itype == BRANCH) {
+        int branch_taken = pipeline[FETCH].instruction_address;
+        if (branch_taken == pipeline[DECODE].instruction_address + 4 && branch_taken != 0) {
+            //branch not taken
+            if (branch_predict_taken == 0) {
+                //branch prediction correct
+                correct_branch_predictions++;
+            }
+            else {
+                //branch prediction incorrect - stall one cycle
+                branch_prediction_incorrect();
+            }
         }
-        else{
-            printf("DATA HIT:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
-
+        else if(branch_taken != 0){
+            //branch taken
+            if (branch_taken != 0) printf("DEBUG: Branch Taken: FETCH addr = %X, DECODE instr addr = %X\n",branch_taken,pipeline[DECODE].instruction_address); //included in sample output
+            if (branch_predict_taken == 1) {
+                //branch prediction correct
+                correct_branch_predictions++;
+            }
+            else {
+                //branch prediction incorrect - stall one cycle
+                branch_prediction_incorrect();
+            }
         }
     }
 
