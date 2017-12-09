@@ -536,6 +536,10 @@ void iplc_sim_push_pipeline_stage()
         }
         else if (data_hit || canForward){
             printf("DATA HIT:\tAddress: %X\n",pipeline[MEM].stage.lw.data_address);
+            if (!data_hit && canForward) {
+                iplc_sim_trap_address(pipeline[MEM].stage.lw.data_address);
+                cache_miss--;
+            }
         }
     }
 
