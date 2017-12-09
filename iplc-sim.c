@@ -299,8 +299,8 @@ void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
  */
 int iplc_sim_trap_address(unsigned int address) //raz
 {
-    int index = bit_twiddling(address, tag_size+1, tag_size+index_size+1);
-    int tag = bit_twiddling(address, 0, tag_size);
+    int index = bit_twiddling(address, cache_blockoffsetbits, cache_blockoffsetbits+index_size);
+    int tag = bit_twiddling(address, cache_blockoffsetbits+index_size+1, cache_blockoffsetbits+index_size+tag_size);
     int set = address % cache_assoc;
     int i = set*cache_assoc+index;
     int j;
