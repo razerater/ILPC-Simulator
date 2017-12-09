@@ -294,7 +294,7 @@ void iplc_sim_LRU_update_on_hit(int address, int tag, int i, int j)
 }
 
 /*
- * Check if the address is in our cache.  Update our counter statistics 
+ * Check if the address is in our cache.  Update our counter statistics
  * for cache_access, cache_hit, etc.  If our configuration supports
  * associativity we may need to check through multiple entries for our
  * desired index.  In that case we will also need to call the LRU functions.
@@ -606,13 +606,6 @@ void iplc_sim_push_pipeline_stage()
             /*for (i = 0; i < CACHE_MISS_DELAY - 1; i++) {
                 push_stages();
             }*/
-        }
-        else if (data_hit || canForward) {
-            printf("DATA HIT:\tAddress: %X\n",pipeline[WRITEBACK].stage.sw.data_address);
-            if (!data_hit && canForward) {
-                iplc_sim_trap_address(pipeline[WRITEBACK].stage.sw.data_address);
-                cache_miss--;
-            }
         }
     }
     else {
